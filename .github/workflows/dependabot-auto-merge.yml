@@ -1,12 +1,15 @@
 name: Dependabot auto-merge
 
+# CI runs with read-only permissions; merge from a trusted workflow afterward.
+# No dependency ecosystem, version, or update-type filters.
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: [CI]
     types: [completed]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: dependabot-auto-merge
@@ -14,21 +17,40 @@ concurrency:
 
 jobs:
   merge:
+    name: Merge successful Dependabot updates
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request'
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
-      # Check out only trusted main; never execute code from a dependency PR.
-      - uses: actions/checkout@v7
-        with:
-          ref: main
-          persist-credentials: false
-
-      - name: Merge eligible Dependabot updates after successful CI
+      - name: Merge Dependabot PR at its tested SHA
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/dependabot-auto-merge.mjs
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_PRS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          set -euo pipefail
+
+          prs=$(jq -r '.[].number' <<< "$EVENT_PRS")
+          # Some Dependabot workflow_run events omit the PR association.
+          if [[ -z "$prs" ]]; then
+            prs=$(gh api "repos/$REPOSITORY/commits/$TESTED_SHA/pulls" --jq '.[].number')
+          fi
+
+          while IFS= read -r number; do
+            [[ -n "$number" ]] || continue
+            pr=$(gh api "repos/$REPOSITORY/pulls/$number")
+            if ! jq -e --arg repo "$REPOSITORY" --arg sha "$TESTED_SHA" '
+              .user.login == "dependabot[bot]" and
+              .state == "open" and
+              .head.sha == $sha and
+              .head.repo.full_name == $repo
+            ' <<< "$pr" >/dev/null; then
+              continue
+            fi
+
+            gh api --method PUT "repos/$REPOSITORY/pulls/$number/merge" \
+              -f sha="$TESTED_SHA" -f merge_method=squash
+          done <<< "$prs"
