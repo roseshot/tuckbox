@@ -106,15 +106,11 @@ CI uses a synthetic D1 UUID and **does not** migrate or publish a production Wor
 
 [Dependabot configuration](../.github/dependabot.yml) checks **npm, Go modules, Docker images, and GitHub Actions** weekly (Thursday, 01:00 UTC). It has **no version ignore rules**.
 
-The [auto-merge workflow](../.github/workflows/dependabot-auto-merge.yml) evaluates successful PR CI after completion, using trusted `main` code. It:
+**Every Dependabot PR is squash-merged once the full pull-request CI workflow succeeds**, regardless of major, minor, patch, prerelease, update type, package ecosystem, or number of dependency commits. No manual auto-merge opt-in is needed.
 
-- Can squash-merge **patch, minor, major, and prerelease** versions.
-- Checks Dependabot identity/metadata, source commit signatures and successful PR CI.
-- Rejects mismatched/stale head or base SHAs and other invalid merge contexts.
+The [auto-merge workflow](../.github/workflows/dependabot-auto-merge.yml) runs in a separate trusted context after CI completes. It requires the workflow's `success` conclusion, confirms the PR author is `dependabot[bot]` and the current head SHA matches the commit validated by CI, then attempts to squash-merge using the GitHub API. It can also find the associated PR from that commit if GitHub omits the association from the event. It does **not** require signed commits, Dependabot commit-message metadata, an unchanged base SHA, a particular mergeability state, or a specific version/update type.
 
-This is a **post-CI custom merge workflow**, not GitHub's native per-PR Auto-merge switch. For defense in depth, configure branch protection on `main` to require successful CI, when your repository's rules permit it.
-
-**Risk:** Major and prerelease dependency upgrades are intentionally eligible for merging. Tests and deployment monitoring remain necessary, especially after breaking upstream releases.
+Failed or cancelled CI cannot trigger a merge. A newer untested PR commit, merge conflict, or enforced GitHub repository rules can still prevent merging. GitHub's native per-PR Auto-merge setting is not needed. CI does not deploy to production; monitor deployed behavior after breaking dependency updates.
 
 ## Contributing
 
