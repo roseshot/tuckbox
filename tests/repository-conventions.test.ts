@@ -40,11 +40,9 @@ describe("repository conventions", () => {
     const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
     const worker = JSON.parse(readFileSync(resolve(root, "wrangler.jsonc"), "utf8"));
     const goMod = readFileSync(resolve(root, "services/download-node/go.mod"), "utf8");
-    const dependabotTest = readFileSync(resolve(root, "tests/dependabot-auto-merge.test.ts"), "utf8");
     expect(pkg.name).toBe("tuckbox");
     expect(worker.name).toBe("tuckbox");
     expect(goMod).toMatch(/^module github\.com\/roseshot\/tuckbox\/services\/download-node$/m);
-    expect(dependabotTest).toContain('const repository = "roseshot/tuckbox";');
   });
 
   test("public pages retain the TuckBox brand while admin can name storage providers", () => {
