@@ -1,7 +1,7 @@
 name: Dependabot auto-merge
 
 # CI runs with read-only permissions; merge from a trusted workflow afterward.
-# No dependency ecosystem, version, or update-type filters.
+# Every Dependabot dependency update is eligible after successful CI.
 on:
   workflow_run:
     workflows: [CI]
